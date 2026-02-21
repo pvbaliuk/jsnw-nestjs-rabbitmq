@@ -1,7 +1,15 @@
-import {SetMetadata} from '@nestjs/common';
+import {Inject, SetMetadata} from '@nestjs/common';
 import type {RabbitmqSubscribeDecoratorParams, RabbitmqSubscriptionMetadata} from './rabbitmq.types';
-import {RABBITMQ_SUBSCRIBE_METADATA_KEY} from './rabbitmq.consts';
+import {RABBITMQ_INSTANCE_DEFAULT_NAME, RABBITMQ_SUBSCRIBE_METADATA_KEY} from './rabbitmq.consts';
 import {getInstanceToken} from './rabbitmq.helpers';
+
+/**
+ * @param {string} [instanceName = RABBITMQ_INSTANCE_DEFAULT_NAME]
+ * @return {PropertyDecorator & ParameterDecorator}
+ * @constructor
+ */
+export const InjectRabbitmq = (instanceName: string = RABBITMQ_INSTANCE_DEFAULT_NAME): PropertyDecorator & ParameterDecorator =>
+    Inject(getInstanceToken(instanceName));
 
 /**
  * @return {MethodDecorator}
@@ -10,8 +18,8 @@ import {getInstanceToken} from './rabbitmq.helpers';
 export const RabbitmqSubscribe = (params: RabbitmqSubscribeDecoratorParams): MethodDecorator => {
     return (target: object, key: string|symbol, descriptor: TypedPropertyDescriptor<any>) => {
         SetMetadata(RABBITMQ_SUBSCRIBE_METADATA_KEY, <RabbitmqSubscriptionMetadata>{
-            instanceName: params.instanceName,
-            instanceToken: getInstanceToken(params.instanceName),
+            instanceName: params.instanceName ?? RABBITMQ_INSTANCE_DEFAULT_NAME,
+            instanceToken: getInstanceToken(params.instanceName ?? RABBITMQ_INSTANCE_DEFAULT_NAME),
             id: params.id,
             queue: params.queue,
             autoStart: params.autoStart !== undefined ? params.autoStart : true,

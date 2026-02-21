@@ -14,7 +14,7 @@ export type RabbitmqForFeatureParams = {
 }
 
 export type RabbitmqSubscribeDecoratorParams = RabbitmqSubscribeParams & {
-    instanceName: string;
+    instanceName?: string;
 }
 
 export type RabbitmqSubscriptionMetadata = Required<RabbitmqSubscribeParams> & {
