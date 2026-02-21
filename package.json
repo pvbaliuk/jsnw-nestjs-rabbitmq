@@ -1,6 +1,7 @@
 {
   "name": "@jsnw/nestjs-rabbitmq",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "description": "NestJS module for RabbitMQ integration with decorator-based consumers, message validation, and dead-letter exchange support",
   "main": "./dist/index.js",
   "types": "./dist/types/index.d.ts",
   "exports": {
@@ -29,7 +30,12 @@
     "url": "https://github.com/pvbaliuk/jsnw-nestjs-rabbitmq/issues"
   },
   "homepage": "https://github.com/pvbaliuk/jsnw-nestjs-rabbitmq#readme",
-  "keywords": [],
+  "keywords": [
+    "nestjs",
+    "rabbitmq",
+    "validation",
+    "consumer"
+  ],
   "author": {
     "name": "Pavlo Baliuk",
     "email": "jsnow0177@gmail.com"
