@@ -1,7 +1,7 @@
 import {type DynamicModule, type FactoryProvider, type Provider, Global, Module} from '@nestjs/common';
 import type {RabbitmqForRootParams} from './rabbitmq.types';
 import {RABBITMQ_INSTANCE_DEFAULT_NAME} from './rabbitmq.consts';
-import {getInstanceToken} from './rabbitmq.helpers';
+import {getInstanceToken, resolveInstanceName} from './rabbitmq.helpers';
 import {RabbitmqInstancesManager} from './rabbitmq-instances-manager';
 import {RabbitmqExplorerService} from './rabbitmq-explorer.service';
 import {Rabbitmq} from './rabbitmq';
@@ -26,7 +26,7 @@ export class RabbitmqCoreModule{
         providers.push(instanceProvider);
         if(params.isDefault)
             providers.push({
-                provide: RABBITMQ_INSTANCE_DEFAULT_NAME,
+                provide: getInstanceToken(RABBITMQ_INSTANCE_DEFAULT_NAME),
                 useExisting: getInstanceToken(params)
             });
 
