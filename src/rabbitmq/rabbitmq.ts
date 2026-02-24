@@ -4,6 +4,7 @@ import {RabbitmqExchange} from './rabbitmq-exchange';
 import {RabbitmqQueue} from './rabbitmq-queue';
 import {Logger} from '@nestjs/common';
 import {Jsonifiable} from 'type-fest';
+import {RabbitmqSubscriber} from './rabbitmq-subscriber';
 
 export type RabbitmqConstructorParams = {
     name: string;
@@ -41,7 +42,7 @@ export type RabbitmqSubscribeParams = {
     autoStart?: never;
 });
 
-export type RabbitmqSubscriber = {instance: any; methodName: string;} | ((data: any, message: AsyncMessage) => RabbitmqResponse | Promise<RabbitmqResponse>);
+export type RabbitmqSubscriberFunction = {instance: any; methodName: string;} | ((data: any, message: AsyncMessage) => RabbitmqResponse | Promise<RabbitmqResponse>);
 
 export type RabbitmqPublishOptions = {
     exchange: RabbitmqExchange;
@@ -63,8 +64,7 @@ export class Rabbitmq{
     protected readonly connection: Connection;
     protected readonly exchanges = new Map<string, RabbitmqExchange>();
     protected readonly queues = new Map<string, RabbitmqQueue>();
-    protected readonly consumers = new Set<Consumer>;
-    protected readonly consumersById = new Map<string, {isStarted: boolean; consumer: Consumer;}>();
+    protected readonly subscribers = new Map<string, RabbitmqSubscriber>;
     protected publisher: Publisher|null = null;
 
     public constructor(name: string, connection: Connection);
@@ -169,27 +169,45 @@ export class Rabbitmq{
     }
 
     /**
-     * @param {RabbitmqSubscribeParams} params
-     * @param {RabbitmqSubscriber} subscriber
-     * @returns {Promise<void>}
+     * @param {RabbitmqQueue} queue
+     * @return {Promise<number>}
      */
-    public async subscribe(params: RabbitmqSubscribeParams, subscriber: RabbitmqSubscriber): Promise<void>{
+    public async purgeQueue(queue: RabbitmqQueue): Promise<number>{
+        const {messageCount} = await this.connection.queuePurge({
+            queue: queue.name
+        });
+
+        return messageCount;
+    }
+
+    /**
+     * @param {RabbitmqSubscribeParams} params
+     * @param {RabbitmqSubscriberFunction} subscriber
+     * @return {Promise<RabbitmqSubscriber>}
+     */
+    public async subscribe(params: RabbitmqSubscribeParams, subscriber: RabbitmqSubscriberFunction): Promise<RabbitmqSubscriber>{
+        const id = params.id ?? (
+            typeof subscriber === 'function'
+                ? Math.random().toString()
+                : subscriber.instance.constructor.name + '.' + subscriber.methodName
+        );
+
         await this.declareQueue(params.queue);
+        if(this.subscribers.has(id))
+            throw new Error(`Seems like a subscriber (id: ${id}) already registered`);
 
-        const consumer = this.connection.createConsumer({
-            queue: params.queue.name,
-            requeue: !!params.requeue,
-            qos: {
-                prefetchSize: params.prefetchSize ?? 0,
-                prefetchCount: params.prefetchCount ?? 1
-            },
-            concurrency: params.concurrency ?? 1,
-            lazy: !!params.autoStart
-        }, this.internalConsumer.bind(this, params, subscriber));
+        const rmqSubscriber = new RabbitmqSubscriber(id, this.connection, params, subscriber);
+        this.subscribers.set(id, rmqSubscriber);
 
-        this.consumers.add(consumer);
-        if(params.id)
-            this.consumersById.set(params.id, {isStarted: !!params.autoStart, consumer: consumer});
+        return rmqSubscriber;
+    }
+
+    /**
+     * @param {string} id
+     * @return {RabbitmqSubscriber | null}
+     */
+    public getSubscriberById(id: string): RabbitmqSubscriber|null{
+        return this.subscribers.get(id) ?? null;
     }
 
     /**
@@ -197,83 +215,31 @@ export class Rabbitmq{
      * @returns {void}
      */
     public startSubscriber(id: string): void{
-        const consumer = this.consumersById.get(id);
-        if(!consumer)
+        const subscriber = this.subscribers.get(id);
+        if(!subscriber)
             throw new Error(`Subscriber ${id} not found for connection ${this.name}`);
 
-        if(consumer.isStarted)
-            return;
+        subscriber.start();
+    }
 
-        consumer.isStarted = true;
-        consumer.consumer.start();
+    /**
+     * @param {string} id
+     * @return {Promise<void>}
+     */
+    public async stopSubscriber(id: string): Promise<void>{
+        const subscriber = this.subscribers.get(id);
+        if(!subscriber)
+            throw new Error(`Subscriber ${id} not found for connection ${this.name}`);
+
+        await subscriber.stop();
     }
 
     /**
      * @returns {void}
      */
     public startPendingSubscribers(): void{
-        for(const consumer of this.consumersById.values()){
-            if(consumer.isStarted)
-                continue;
-
-            consumer.isStarted = true;
-            consumer.consumer.start();
-        }
-    }
-
-    /**
-     * @param {RabbitmqSubscribeParams} params
-     * @param {RabbitmqSubscriber} subscriber
-     * @param {AsyncMessage} message
-     * @returns {Promise<ConsumerStatus>}
-     * @private
-     */
-    private async internalConsumer(params: RabbitmqSubscribeParams, subscriber: RabbitmqSubscriber, message: AsyncMessage): Promise<ConsumerStatus>{
-        if(!message.body || (typeof message.body !== 'string' && !Buffer.isBuffer(message.body)))
-            return ConsumerStatus.DROP;
-
-        const messageBody = Buffer.isBuffer(message.body)
-            ? message.body.toString('utf-8')
-            : typeof message.body === 'string'
-                ? message.body
-                : null;
-
-        if(!messageBody)
-            return ConsumerStatus.DROP;
-
-        const isJSON = message.contentType === 'application/json';
-        let data: any;
-
-        try{
-            data = isJSON ? JSON.parse(messageBody) : messageBody;
-        }catch(e){
-            this.logger.error(`Failed to parse message body as JSON`);
-            return ConsumerStatus.DROP;
-        }
-
-        if(!!params.validation?.schema){
-            const {data: parsed, error, success} = params.validation.schema.safeParse(data);
-            if(error || !success)
-                return this.mapRabbitmqResponseToConsumerStatus(params.validation.onFail ?? 'drop');
-
-            data = parsed;
-        }
-
-        const subscriberName = typeof subscriber === 'function'
-            ? subscriber.name ?? 'anonymous function'
-            : `${subscriber.instance.constructor.name}.${subscriber.methodName}`;
-
-        try{
-            const response = await (typeof subscriber === 'function'
-                ? subscriber(data, message)
-                : subscriber.instance[subscriber.methodName](data, message)
-            );
-
-            return this.mapRabbitmqResponseToConsumerStatus(response);
-        }catch(e){
-            this.logger.error(`Error in subscriber ${subscriberName} (connection: ${this.name}). Error: ${e.constructor.name}(${e.message ?? ''})`);
-            return !!params.requeue ? ConsumerStatus.REQUEUE : ConsumerStatus.DROP;
-        }
+        for(const subscriber of this.subscribers.values())
+            subscriber.start();
     }
 
     /**
@@ -294,28 +260,12 @@ export class Rabbitmq{
     }
 
     /**
-     * @param {RabbitmqResponse | string} response
-     * @return {ConsumerStatus}
-     * @protected
-     */
-    protected mapRabbitmqResponseToConsumerStatus(response: RabbitmqResponse|string): ConsumerStatus{
-        response = response.toLowerCase() as RabbitmqResponse | string;
-        switch(response){
-            case 'ack': return ConsumerStatus.ACK;
-            case 'requeue': return ConsumerStatus.REQUEUE;
-            case 'drop': return ConsumerStatus.DROP;
-        }
-
-        return ConsumerStatus.DROP;
-    }
-
-    /**
      * @return {Promise<void>}
      */
     public async close(): Promise<void>{
         const promises: Promise<void>[] = [];
-        for(const consumer of this.consumers.values())
-            promises.push(consumer.close());
+        for(const subscriber of this.subscribers.values())
+            promises.push(subscriber.stop());
 
         promises.push(this.connection.close());
         await Promise.allSettled(promises);
