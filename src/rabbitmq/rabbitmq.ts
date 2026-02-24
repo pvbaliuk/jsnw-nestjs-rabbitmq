@@ -22,6 +22,11 @@ export type RabbitmqConstructorParams = {
 
 export type RabbitmqResponse = 'ack' | 'drop' | 'requeue';
 
+export type RabbitmqQueueStats = {
+    messages: number;
+    consumers: number;
+}
+
 export type RabbitmqMessageValidation = {
     schema: z.ZodTypeAny;
     onFail?: RabbitmqResponse;
@@ -165,6 +170,23 @@ export class Rabbitmq{
                     routingKey: routingKey
                 })));
             }
+        }
+    }
+
+    /**
+     * @param {RabbitmqQueue | string} queue
+     * @return {Promise<RabbitmqQueueStats | null>}
+     */
+    public async queueStats(queue: RabbitmqQueue|string): Promise<RabbitmqQueueStats|null>{
+        try{
+            const {messageCount, consumerCount} = await this.connection.queueDeclare({
+                queue: typeof queue === 'string' ? queue : queue.name,
+                passive: true
+            });
+
+            return {messages: messageCount, consumers: consumerCount};
+        }catch(e){
+            return null;
         }
     }
 
