@@ -278,9 +278,11 @@ export class Rabbitmq{
      * @param {RabbitmqPublishOptions} options
      * @return {Promise<void>}
      */
-    public publish(options: RabbitmqPublishOptions): Promise<void>{
+    public async publish(options: RabbitmqPublishOptions): Promise<void>{
         if(!this.publisher)
             this.publisher = this.connection.createPublisher();
+
+        await this.declareExchange(options.exchange);
 
         return this.publisher.send({
             exchange: options.exchange.name,

@@ -22,4 +22,10 @@ export {
     type RabbitmqQueueDeclaration
 } from './rabbitmq-queue';
 
+export {
+    RabbitmqMessage,
+    type RabbitmqMessageType,
+    type RabbitmqMessageTemplate
+} from './rabbitmq-message';
+
 export {RabbitmqSubscriber} from './rabbitmq-subscriber';
