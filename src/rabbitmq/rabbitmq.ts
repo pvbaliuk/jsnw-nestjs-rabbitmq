@@ -33,19 +33,15 @@ export type RabbitmqMessageValidation = {
 };
 
 export type RabbitmqSubscribeParams = {
+    id?: string;
     queue: RabbitmqQueue;
     requeue?: boolean;
     concurrency?: number;
     prefetchSize?: number;
     prefetchCount?: number;
     validation?: RabbitmqMessageValidation;
-} & ({
-    id: string;
-    autoStart: boolean;
-} | {
-    id?: never;
-    autoStart?: never;
-});
+    autoStart?: boolean;
+};
 
 export type RabbitmqSubscriberFunction = {instance: any; methodName: string;} | ((data: any, message: AsyncMessage) => RabbitmqResponse | Promise<RabbitmqResponse>);
 
