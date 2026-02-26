@@ -6,6 +6,7 @@ import {
     type ValueProvider,
     type OnApplicationShutdown
 } from '@nestjs/common';
+import {DiscoveryModule, Reflector} from '@nestjs/core';
 import {Rabbitmq} from './rabbitmq';
 import type {RabbitmqOptions} from './rabbitmq.types';
 import {RABBITMQ_OPTIONS_TOKEN} from './rabbitmq.consts';
@@ -13,7 +14,15 @@ import {RabbitmqStorage} from './rabbitmq.storage';
 import {RabbitmqExplorerService} from './rabbitmq-explorer.service';
 
 @Global()
-@Module({})
+@Module({
+    imports: [
+        DiscoveryModule
+    ],
+    providers: [
+        Reflector,
+        RabbitmqExplorerService
+    ]
+})
 export class RabbitmqCoreModule implements OnApplicationShutdown{
 
     /**
@@ -26,10 +35,10 @@ export class RabbitmqCoreModule implements OnApplicationShutdown{
 
         return {
             module: RabbitmqCoreModule,
+            imports: [],
             providers: [
                 optionsProvider,
-                rabbitmqProvider,
-                RabbitmqExplorerService
+                rabbitmqProvider
             ],
             exports: [
                 rabbitmqProvider

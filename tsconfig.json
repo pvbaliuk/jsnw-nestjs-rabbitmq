@@ -6,6 +6,8 @@
     "rootDir": "./src",
     "outDir": "./dist/lib",
     "declaration": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "declarationDir": "./dist/types",
     "skipLibCheck": true,
     "esModuleInterop": true

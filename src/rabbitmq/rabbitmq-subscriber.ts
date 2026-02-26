@@ -47,6 +47,16 @@ export class RabbitmqSubscriber{
         this._isActive = !params.autoStart;
         this.consumer = this.connection.createConsumer({
             queue: params.queue.name,
+            queueOptions: {
+                queue: params.queue.name,
+                durable: params.queue.durable,
+                autoDelete: params.queue.autoDelete,
+                arguments: {
+                    ...params.queue.arguments,
+                    'x-dead-letter-exchange': params.queue.deadLetterExchange?.name ?? undefined,
+                    'x-dead-letter-routing-key': params.queue.deadLetterRoutingKey ?? undefined
+                }
+            },
             requeue: !!params.requeue,
             qos: {
                 prefetchSize: params.prefetchSize ?? 0,
