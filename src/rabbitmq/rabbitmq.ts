@@ -266,9 +266,16 @@ export class Rabbitmq{
             exchange: options.exchange.name,
             routingKey: options.routingKey,
             durable: options.durable !== undefined ? options.durable : options.exchange.durable,
-            contentType: options.type === 'json' ? 'application/json' : undefined,
+            /*
+            As it turned out, rabbitmq-client's Envelope['contentType'] is not used anywhere,
+            the library sets contentType property based on the type of message body and completely
+            disregards contentType set in the Envelope
+
+            https://github.com/cody-greene/node-rabbitmq-client/blob/af2317717e2ef169717f2371ddf2c8bf2843ed37/src/Channel.ts#L501
+            */
+            // contentType: options.type === 'json' ? 'application/json' : undefined,
             expiration: options.ttlMs?.toString() ?? undefined
-        }, options.type === 'json' ? JSON.stringify(options.message) : options.message);
+        }, options.message);
     }
 
     /**
