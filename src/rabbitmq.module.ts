@@ -1,46 +1,45 @@
-import {type DynamicModule, Module} from '@nestjs/common';
-import type {RabbitmqForFeatureParams, RabbitmqForRootParams} from './rabbitmq.types';
-import {RabbitmqMetadataStorage} from './rabbitmq-metadata-storage';
+import {Module, type DynamicModule} from '@nestjs/common';
+import type {RabbitmqOptions} from './rabbitmq.types';
 import {RabbitmqCoreModule} from './rabbitmq-core.module';
-import {getInstanceToken, resolveInstanceName} from './rabbitmq.helpers';
-import {RABBITMQ_INSTANCE_DEFAULT_NAME} from './rabbitmq.consts';
+import {RabbitmqExchange, RabbitmqQueue} from './rabbitmq';
+import {RabbitmqStorage} from './rabbitmq.storage';
 
 @Module({})
 export class RabbitmqModule{
 
     /**
-     * @param {RabbitmqForRootParams} params
+     * @param {RabbitmqOptions} options
      * @return {DynamicModule}
      */
-    public static forRoot(params: RabbitmqForRootParams): DynamicModule{
-        RabbitmqMetadataStorage.addMetadata(params, {
-            exchanges: params.exchanges ?? [],
-            queues: params.queues ?? []
-        });
-
+    public static forRoot(options: RabbitmqOptions): DynamicModule{
         return {
             module: RabbitmqModule,
             imports: [
-                RabbitmqCoreModule.forRoot(params)
-            ],
-            exports: [],
-            providers: []
+                RabbitmqCoreModule.forRoot(options)
+            ]
         };
     }
 
+    public static forFeature(declarations?: (RabbitmqExchange|RabbitmqQueue)[]):DynamicModule;
+    public static forFeature(declarations?: {exchanges?: RabbitmqExchange[]; queues?: RabbitmqQueue[];}): DynamicModule;
     /**
-     * @param {RabbitmqForFeatureParams} params
+     * @param {(RabbitmqExchange | RabbitmqQueue)[] | {exchanges?: RabbitmqExchange[], queues?: RabbitmqQueue[]}} declarations
      * @return {DynamicModule}
      */
-    public static forFeature(params: RabbitmqForFeatureParams): DynamicModule{
-        RabbitmqMetadataStorage.addMetadata(getInstanceToken(params.name ? resolveInstanceName(params.name) : RABBITMQ_INSTANCE_DEFAULT_NAME), {
-            exchanges: params.exchanges ?? [],
-            queues: params.queues ?? []
-        });
+    public static forFeature(declarations?: ((RabbitmqExchange|RabbitmqQueue)[])|{exchanges?: RabbitmqExchange[]; queues?: RabbitmqQueue[];}): DynamicModule{
+        if(declarations){
+            if(Array.isArray(declarations) && declarations.length > 0)
+                RabbitmqStorage.addAny(declarations);
+
+            if('exchanges' in declarations && Array.isArray(declarations.exchanges) && declarations.exchanges.length > 0)
+                RabbitmqStorage.addExchanges(declarations.exchanges);
+
+            if('queues' in declarations && Array.isArray(declarations.queues) && declarations.queues.length > 0)
+                RabbitmqStorage.addQueues(declarations.queues);
+        }
 
         return {
             module: RabbitmqModule,
-            imports: [],
             providers: [],
             exports: []
         };

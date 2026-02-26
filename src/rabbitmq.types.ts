@@ -1,28 +1,7 @@
-import type {
-    RabbitmqConstructorParams, RabbitmqExchange, RabbitmqQueue,
-    RabbitmqSubscribeParams
-} from './rabbitmq';
+import {type ConnectionOptions} from 'rabbitmq-client';
+import {type RabbitmqExchange, type RabbitmqQueue} from './rabbitmq';
 
-export type RabbitmqForRootParams = RabbitmqConstructorParams & {name?: string;} & Omit<RabbitmqForFeatureParams, 'name'> & {
-    isDefault?: boolean;
-};
-
-export type RabbitmqForFeatureParams = {
-    name?: string;
+export type RabbitmqOptions = ConnectionOptions & {
     exchanges?: RabbitmqExchange[];
     queues?: RabbitmqQueue[];
-}
-
-export type RabbitmqSubscribeDecoratorParams = RabbitmqSubscribeParams & {
-    instanceName?: string;
-}
-
-export type RabbitmqSubscriptionMetadata = Required<RabbitmqSubscribeParams> & {
-    instanceName: string;
-    instanceToken: string;
-    validation: Required<RabbitmqSubscribeParams['validation']>|null;
-}
-
-export type Prettify<T> = {
-    [K in keyof T]: T[K];
-} & {};
+};

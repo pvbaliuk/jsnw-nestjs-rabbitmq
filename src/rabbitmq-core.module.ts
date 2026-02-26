@@ -1,74 +1,88 @@
-import {type DynamicModule, type FactoryProvider, type Provider, Global, Module} from '@nestjs/common';
-import type {RabbitmqForRootParams} from './rabbitmq.types';
-import {RABBITMQ_INSTANCE_DEFAULT_NAME} from './rabbitmq.consts';
-import {getInstanceToken, resolveInstanceName} from './rabbitmq.helpers';
-import {RabbitmqInstancesManager} from './rabbitmq-instances-manager';
-import {RabbitmqExplorerService} from './rabbitmq-explorer.service';
+import {
+    Global,
+    Module,
+    type DynamicModule,
+    type FactoryProvider,
+    type ValueProvider,
+    type OnApplicationShutdown
+} from '@nestjs/common';
 import {Rabbitmq} from './rabbitmq';
+import type {RabbitmqOptions} from './rabbitmq.types';
+import {RABBITMQ_OPTIONS_TOKEN} from './rabbitmq.consts';
+import {RabbitmqStorage} from './rabbitmq.storage';
+import {RabbitmqExplorerService} from './rabbitmq-explorer.service';
 
 @Global()
-@Module({
-    providers: [
-        RabbitmqInstancesManager,
-        RabbitmqExplorerService
-    ]
-})
-export class RabbitmqCoreModule{
+@Module({})
+export class RabbitmqCoreModule implements OnApplicationShutdown{
 
     /**
-     * @param {RabbitmqForRootParams} params
+     * @param {RabbitmqOptions} options
      * @return {DynamicModule}
      */
-    public static forRoot(params: RabbitmqForRootParams): DynamicModule{
-        const providers: Provider[] = [];
-        const instanceProvider = this.createInstanceProvider(params);
-
-        providers.push(instanceProvider);
-        if(params.isDefault)
-            providers.push({
-                provide: getInstanceToken(RABBITMQ_INSTANCE_DEFAULT_NAME),
-                useExisting: getInstanceToken(params)
-            });
+    public static forRoot(options: RabbitmqOptions): DynamicModule{
+        const optionsProvider = this.createOptionsProvider(options),
+            rabbitmqProvider = this.createRabbitmqProvider();
 
         return {
             module: RabbitmqCoreModule,
-            providers: providers,
-            exports: providers
+            providers: [
+                optionsProvider,
+                rabbitmqProvider,
+                RabbitmqExplorerService
+            ],
+            exports: [
+                rabbitmqProvider
+            ]
         };
     }
 
     /**
-     * @param {RabbitmqForRootParams} params
+     * @param {RabbitmqOptions} options
+     * @return {ValueProvider}
+     * @private
+     */
+    private static createOptionsProvider(options: RabbitmqOptions): ValueProvider{
+        return {
+            provide: RABBITMQ_OPTIONS_TOKEN,
+            useValue: options
+        };
+    }
+
+    /**
      * @return {FactoryProvider}
      * @private
      */
-    private static createInstanceProvider(params: RabbitmqForRootParams): FactoryProvider{
-        const instanceToken = getInstanceToken(params);
+    private static createRabbitmqProvider(): FactoryProvider{
         return {
-            provide: instanceToken,
-            useFactory: (im: RabbitmqInstancesManager) => {
-                const existingInstance = im.getInstance(instanceToken);
-                if(existingInstance)
-                    return existingInstance;
+            provide: Rabbitmq,
+            useFactory: (options: RabbitmqOptions) => {
+                const rabbitmq = new Rabbitmq(options);
 
-                const instance = new Rabbitmq({
-                    name: params.name,
-                    connectionName: params.connectionName,
-                    hostname: params.hostname,
-                    port: params.port,
-                    username: params.username,
-                    password: params.password,
-                    vhost: params.vhost,
-                    connectionTimeout: params.connectionTimeout
-                });
+                if(options.exchanges && options.exchanges.length > 0)
+                    RabbitmqStorage.addExchanges(options.exchanges);
 
-                im.addInstance(instanceToken, instance);
-                return instance;
+                if(options.queues && options.queues.length > 0)
+                    RabbitmqStorage.addQueues(options.queues);
+
+                return rabbitmq;
             },
             inject: [
-                RabbitmqInstancesManager
+                RABBITMQ_OPTIONS_TOKEN
             ]
         };
+    }
+
+    /**
+     * @param {Rabbitmq} rabbit
+     */
+    public constructor(private readonly rabbit: Rabbitmq) {}
+
+    /**
+     * @return {Promise<void>}
+     */
+    public async onApplicationShutdown(): Promise<void>{
+        await this.rabbit.close();
     }
 
 }

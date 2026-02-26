@@ -2,7 +2,6 @@ import {z} from 'zod';
 import {type RabbitmqPublishOptions} from './rabbitmq';
 import {RabbitmqExchange} from './rabbitmq-exchange';
 import {Jsonifiable} from 'type-fest';
-import {Prettify} from '../rabbitmq.types';
 
 export type RabbitmqMessageType = 'raw' | 'json';
 
@@ -50,10 +49,10 @@ export class RabbitmqMessage<T extends RabbitmqMessageTemplate>{
     }
 
     /**
-     * @param {Prettify<InputData<T>>} data
+     * @param {InputData<T>} data
      * @return {RabbitmqPublishOptions}
      */
-    public make(data: Prettify<InputData<T>>): RabbitmqPublishOptions{
+    public make(data: InputData<T>): RabbitmqPublishOptions{
        const payload = this._template.schema
            ? this._template.schema.parse(data)
            : data;

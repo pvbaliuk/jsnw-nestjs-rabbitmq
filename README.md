@@ -1,194 +1,134 @@
 # @jsnw/nestjs-rabbitmq
 
-NestJS module for RabbitMQ integration using [rabbitmq-client](https://www.npmjs.com/package/rabbitmq-client).
+**A lightweight, strictly typed, and predictable RabbitMQ module for NestJS**
+
+## Key features
+- [rabbitmq-client](https://www.npmjs.com/package/rabbitmq-client) inside
+- Full validation for both incoming and outgoing messages using [zod](https://www.npmjs.com/package/zod)
+- Single connection
+- Type-Safe publishing: You cannot publish an invalid payload
+- Exchanges and queues are automatically declared upon application bootstrap
+- No AI. The code is written by human, not a machine
 
 ## Installation
 
 ```bash
-npm i -s @jsnw/nestjs-rabbitmq
+npm i -s @jsnw/nestjs-rabbitmq @nestjs/core@11 @nestjs/common@11
 ```
 
-Additionally, you can install `zod` and `rabbitmq-client`
+Optionally, you can install `zod` and `rabbitmq-client`
 
 ## Quick Start
+### 1. Define exchanges and queues
 
-```typescript
-import { Module } from '@nestjs/common';
-import { RabbitmqModule, RabbitmqExchange, RabbitmqQueue } from '@jsnw/nestjs-rabbitmq';
+```ts
+import {RabbitmqExchange, RabbitmqQueue} from '@jsnw/nestjs-rabbitmq';
+
+export const MY_EXCHANGE = new RabbitmqExchange({
+    name: 'my_exchange',
+    type: 'direct',
+    durable: true,
+    autoDelete: false
+});
+
+export const MY_QUEUE = new RabbitmqQueue({
+    name: 'my_queue',
+    durable: true,
+    autoDelete: false,
+    bindings: [
+        {exchange: MY_EXCHANGE, routingKeys: ['user.created']}
+    ]
+});
+
+```
+
+### 2. Register the module
+
+```ts
+// app.module.ts
+import {Module} from '@nestjs/common';
+import {RabbitmqModule} from '@jsnw/nestjs-rabbitmq';
 
 @Module({
-  imports: [
-    RabbitmqModule.forRoot({
-      name: 'main',
-      hostname: 'localhost',
-      port: 5672,
-      username: 'guest',
-      password: 'guest',
-      isDefault: true
-    })
-  ]
+    imports: [
+        RabbitmqModule.forRoot({
+            hostname: 'localhost',
+            port: 5672,
+            username: 'guest',
+            password: 'guest',
+            exchanges: [MY_EXCHANGE],
+            queues: [MY_QUEUE]
+        })
+    ]
 })
 export class AppModule {}
 ```
 
-## Declaring Exchanges and Queues
+### 3. Define a Message Contract
 
-```typescript
-const ordersExchange = new RabbitmqExchange({
-  name: 'orders',
-  type: 'topic',
-  durable: true
+```ts
+import {z} from 'zod';
+import {RabbitmqMessage} from '@jsnw/nestjs-rabbitmq';
+
+export const USER_CREATED_EVENT = RabbitmqMessage.template({
+    type: 'json',
+    exchange: MY_EXCHANGE,
+    durable: true,
+    routingKey: 'user.created',
+    schema: z.object({
+        id: z.number(),
+        email: z.string().email()
+    })
 });
-
-const ordersQueue = new RabbitmqQueue({
-  name: 'order.created',
-  durable: true,
-  bindings: [
-    { exchange: ordersExchange, routingKeys: ['order.created'] }
-  ]
-});
-
-RabbitmqModule.forRoot({
-  name: 'main',
-  hostname: 'localhost',
-  port: 5672,
-  username: 'guest',
-  password: 'guest',
-  exchanges: [ordersExchange],
-  queues: [ordersQueue]
-})
 ```
 
-## Publishing Messages
-
-```typescript
-import { Injectable } from '@nestjs/common';
-import { InjectRabbitmq, Rabbitmq } from '@jsnw/nestjs-rabbitmq';
+### 4. Publishing messages
+```ts
+import {Injectable} from '@nestjs/common';
+import {Rabbitmq} from '@jsnw/nestjs-rabbitmq';
 
 @Injectable()
-export class OrderService {
-  constructor(
-    @InjectRabbitmq() // injects default instance
-    private readonly rabbitmq: Rabbitmq
-  ) {}
+export class UserService {
 
-  async createOrder(data: any) {
-    await this.rabbitmq.publish({
-      type: 'json',
-      message: data,
-      exchange: ordersExchange,
-      routingKey: 'order.created'
-    });
-  }
+    constructor(private readonly rabbit: Rabbitmq){}
+    
+    async create(dto: any){
+        await this.rabbit.publish(
+            USER_CREATED_EVENT.make({
+                id: 1, 
+                email: 'example@example.com'
+            })
+        );
+    }
+
 }
 ```
 
-To inject a specific instance by name:
+### 5. Subscribing to messages
 
-```typescript
-@InjectRabbitmq('main')
-private readonly rabbitmq: Rabbitmq
-```
-
-## Subscribing to Queues
-
-```typescript
-import { Injectable } from '@nestjs/common';
-import { RabbitmqSubscribe, type AsyncMessage } from '@jsnw/nestjs-rabbitmq';
+```ts
+import {Injectable} from '@nestjs/common';
+import {RabbitmqSubscribe, type AsyncMessage} from '@jsnw/nestjs-rabbitmq';
 
 @Injectable()
-export class OrderConsumer {
-  @RabbitmqSubscribe({
-    queue: ordersQueue,
-    concurrency: 5
-  })
-  async handleOrderCreated(data: any, message: AsyncMessage) {
-    console.log('Order created:', data);
-    return 'ack'; // or 'drop', 'requeue'
-  }
+export class NotificationsService {
+
+    @RabbitmqSubscribe({
+        queue: MY_QUEUE,
+        validation: {
+            schema: USER_CREATED_EVENT.schema,
+            onFail: 'drop'
+        }
+    })
+    async onUserCreated(data: z.infer<typeof USER_CREATED_EVENT.schema>, message: AsyncMessage) {
+
+    }
+
 }
 ```
-
-### Subscriber Options
-
-- `instanceName`: RabbitMQ instance name
-- `queue` (required): Queue to subscribe to
-- `concurrency`: Number of concurrent message handlers (default: 1)
-- `prefetchCount`: Number of messages to prefetch (default: 1)
-- `prefetchSize`: Size of messages to prefetch in bytes (default: 0)
-- `requeue`: Whether to requeue failed messages (default: false)
-- `autoStart`: Auto-start consumer on boot (default: true)
-- `id`: Unique identifier for manual start control
-
-## Message Validation
-
-Use Zod schemas to validate incoming messages:
-
-```typescript
-import { z } from 'zod';
-
-const orderSchema = z.object({
-  orderId: z.string(),
-  amount: z.number()
-});
-
-@RabbitmqSubscribe({
-  instanceName: 'main',
-  queue: ordersQueue,
-  validation: {
-    schema: orderSchema,
-    onFail: 'drop' // or 'ack', 'requeue'
-  }
-})
-async handleOrderCreated(data: z.infer<typeof orderSchema>) {
-  // data is typed and validated
-  return 'ack';
-}
-```
-
-## Dead Letter Exchanges
-
-```typescript
-const dlxExchange = new RabbitmqExchange({
-  name: 'orders.dlx',
-  type: 'topic',
-  durable: true
-});
-
-const queueWithDlx = new RabbitmqQueue({
-  name: 'order.created',
-  durable: true,
-  deadLetterExchange: dlxExchange,
-  deadLetterRoutingKey: 'order.failed',
-  bindings: [{ exchange: ordersExchange, routingKeys: ['order.created'] }]
-});
-```
-
-## Multiple Instances
-
-```typescript
-RabbitmqModule.forRoot({
-  name: 'instance1',
-  hostname: 'localhost',
-  port: 5672,
-  username: 'guest',
-  password: 'guest',
-  isDefault: true
-})
-
-RabbitmqModule.forRoot({
-  name: 'instance2',
-  hostname: 'other-host',
-  port: 5672,
-  username: 'guest',
-  password: 'guest'
-})
-```
-
-## License
-
-MIT
 
 ## Author
-
 Pavlo Baliuk (jsnow0177@gmail.com)
+
+## License
+MIT

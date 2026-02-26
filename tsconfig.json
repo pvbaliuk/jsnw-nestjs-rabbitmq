@@ -4,7 +4,7 @@
     "target": "ES2024",
     "moduleResolution": "Node",
     "rootDir": "./src",
-    "outDir": "./dist",
+    "outDir": "./dist/lib",
     "declaration": true,
     "declarationDir": "./dist/types",
     "skipLibCheck": true,

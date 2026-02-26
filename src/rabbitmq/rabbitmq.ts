@@ -1,24 +1,17 @@
 import {z} from 'zod';
-import {type AsyncMessage, Connection, type Consumer, ConsumerStatus, Publisher} from 'rabbitmq-client';
+import {
+    Connection,
+    type AsyncMessage,
+    type ConnectionOptions,
+    type Publisher,
+} from 'rabbitmq-client';
+import {Logger} from '@nestjs/common';
+import type {Jsonifiable} from 'type-fest';
 import {RabbitmqExchange} from './rabbitmq-exchange';
 import {RabbitmqQueue} from './rabbitmq-queue';
-import {Logger} from '@nestjs/common';
-import {Jsonifiable} from 'type-fest';
 import {RabbitmqSubscriber} from './rabbitmq-subscriber';
 
-export type RabbitmqConstructorParams = {
-    name: string;
-    /**
-     * The name that will be displayed in RabbitMQ management UI. By default - the same as the name
-     */
-    connectionName?: string;
-    hostname: string;
-    port: number;
-    username: string;
-    password: string;
-    vhost?: string;
-    connectionTimeout?: number;
-};
+export type RabbitmqConstructorParams = ConnectionOptions & {};
 
 export type RabbitmqResponse = 'ack' | 'drop' | 'requeue';
 
@@ -74,7 +67,6 @@ export type RabbitmqPublishOptions = {
 
 export class Rabbitmq{
 
-    public readonly name: string;
     protected readonly logger: Logger;
     protected readonly connection: Connection;
     protected readonly exchanges = new Map<string, RabbitmqExchange>();
@@ -82,29 +74,14 @@ export class Rabbitmq{
     protected readonly subscribers = new Map<string, RabbitmqSubscriber>;
     protected publisher: Publisher|null = null;
 
-    public constructor(name: string, connection: Connection);
-    public constructor(params: RabbitmqConstructorParams);
+    public constructor(connection: Connection);
+    public constructor(options: RabbitmqConstructorParams);
     /**
-     * @param {string | RabbitmqConstructorParams} arg1
-     * @param {Connection} arg2
+     * @param {Connection | RabbitmqConstructorParams} arg
      */
-    public constructor(arg1: string|RabbitmqConstructorParams, arg2?: Connection) {
-        if(typeof arg1 === 'string' && !arg2)
-            throw new TypeError(`Invalid second argument passed to the constructor of ${Rabbitmq.name}`);
-
-        this.name = typeof arg1 === 'string' ? arg1 : arg1.name;
-        this.logger = new Logger(Rabbitmq.name + `(${this.name})`);
-        this.connection = typeof arg1 === 'string'
-            ? arg2!
-            : new Connection({
-                connectionName: arg1.connectionName ?? arg1.name,
-                hostname: arg1.hostname,
-                port: arg1.port,
-                username: arg1.username,
-                password: arg1.password,
-                vhost: arg1.vhost ?? '/',
-                connectionTimeout: arg1.connectionTimeout ?? 10_000
-            });
+    public constructor(arg: Connection|RabbitmqConstructorParams) {
+        this.logger = new Logger(this.constructor.name);
+        this.connection = arg instanceof Connection ? arg : new Connection(arg);
     }
 
     /**
@@ -249,7 +226,7 @@ export class Rabbitmq{
     public startSubscriber(id: string): void{
         const subscriber = this.subscribers.get(id);
         if(!subscriber)
-            throw new Error(`Subscriber ${id} not found for connection ${this.name}`);
+            throw new Error(`Subscriber ${id} not found`);
 
         subscriber.start();
     }
@@ -261,7 +238,7 @@ export class Rabbitmq{
     public async stopSubscriber(id: string): Promise<void>{
         const subscriber = this.subscribers.get(id);
         if(!subscriber)
-            throw new Error(`Subscriber ${id} not found for connection ${this.name}`);
+            throw new Error(`Subscriber ${id} not found`);
 
         await subscriber.stop();
     }
@@ -300,6 +277,9 @@ export class Rabbitmq{
         const promises: Promise<void>[] = [];
         for(const subscriber of this.subscribers.values())
             promises.push(subscriber.stop());
+
+        if(this.publisher)
+            promises.push(this.publisher.close());
 
         promises.push(this.connection.close());
         await Promise.allSettled(promises);
