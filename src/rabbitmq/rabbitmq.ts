@@ -1,3 +1,4 @@
+import {randomUUID, type UUID} from 'node:crypto';
 import {z} from 'zod';
 import {
     Connection,
@@ -197,7 +198,7 @@ export class Rabbitmq{
     public async subscribe(params: RabbitmqSubscribeParams, subscriber: RabbitmqSubscriberFunction): Promise<RabbitmqSubscriber>{
         const id = params.id ?? (
             typeof subscriber === 'function'
-                ? Math.random().toString()
+                ? randomUUID()
                 : subscriber.instance.constructor.name + '.' + subscriber.methodName
         );
 

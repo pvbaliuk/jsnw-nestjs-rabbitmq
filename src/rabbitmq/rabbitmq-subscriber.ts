@@ -94,40 +94,33 @@ export class RabbitmqSubscriber{
      * @private
      */
     protected onMessage = async (message: AsyncMessage): Promise<ConsumerStatus> => {
-        if(!message.body || (typeof message.body !== 'string' && !Buffer.isBuffer(message.body)))
+        if(!message.body || (typeof message.body !== 'string' && typeof message.body !== 'object' && !Buffer.isBuffer(message.body)))
             return ConsumerStatus.DROP;
 
-        const messageBody = Buffer.isBuffer(message.body)
-            ? message.body.toString('utf-8')
-            : typeof message.body === 'string'
-                ? message.body
-                : null;
-
-        if(!messageBody)
-            return ConsumerStatus.DROP;
-
-        const isJSON = message.contentType === 'application/json';
-        let data: any;
-
+        let payload: string|object|null = null;
         try{
-            data = isJSON ? JSON.parse(messageBody) : messageBody;
+            payload = this.getMessageBody(message);
         }catch(e){
-            this.logger.error(`Failed to parse message body as JSON`);
+            if(e instanceof Error && e.name === 'SyntaxError')
+                this.logger.error('Failed to parse message body as JSON');
+
             return ConsumerStatus.DROP;
         }
 
         if(!!this.params.validation?.schema){
-            const {data: parsed, error, success} = this.params.validation.schema.safeParse(data);
-            if(error || !success)
+            const {data: parsed, error, success} = this.params.validation.schema.safeParse(payload);
+            if(error || !success){
+                this.logger.error(`Failed to validate message. Error:\n${z.prettifyError(error)}`);
                 return mapRabbitmqResponseToConsumerStatus(this.params.validation.onFail ?? 'drop');
+            }
 
-            data = parsed;
+            payload = parsed as any;
         }
 
         try{
             const response = await (typeof this.subscriber === 'function'
-                    ? this.subscriber(data, message)
-                    : this.subscriber.instance[this.subscriber.methodName](data, message)
+                    ? this.subscriber(payload, message)
+                    : this.subscriber.instance[this.subscriber.methodName](payload, message)
             );
 
             return mapRabbitmqResponseToConsumerStatus(response);
@@ -139,6 +132,36 @@ export class RabbitmqSubscriber{
 
             this.logger.error(`Error: ${e.constructor.name}(${e.message ?? ''})`);
             return !!this.params.requeue ? ConsumerStatus.REQUEUE : ConsumerStatus.DROP;
+        }
+    }
+
+    /**
+     * @param {AsyncMessage} message
+     * @return {string | object | null}
+     * @private
+     */
+    private getMessageBody(message: AsyncMessage): string|object|null{
+        if(!message.body || (
+            typeof message.body !== 'string'
+            && typeof message.body !== 'object'
+            && !Buffer.isBuffer(message.body))
+        ) return null;
+
+        if(message.contentType === 'application/json'){
+            if(Buffer.isBuffer(message.body) || typeof message.body === 'string'){
+                const jsonString = Buffer.isBuffer(message.body)
+                    ? message.body.toString('utf-8')
+                    : message.body;
+
+                return JSON.parse(jsonString);
+            }
+
+            return message.body;
+        }else{
+            if(Buffer.isBuffer(message.body))
+                return message.body.toString('utf-8');
+
+            return message.body;
         }
     }
 
