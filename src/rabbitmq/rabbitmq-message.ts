@@ -26,6 +26,13 @@ export class RabbitmqMessage<T extends RabbitmqMessageTemplate>{
     private readonly _template: T;
 
     /**
+     * @return {T["schema"]}
+     */
+    public get schema(): T['schema']{
+        return this._template.schema;
+    }
+
+    /**
      * @param {T} template
      * @return {RabbitmqMessageTemplate<T>}
      */
