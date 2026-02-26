@@ -3,7 +3,7 @@ import type {
     RabbitmqSubscribeParams
 } from './rabbitmq';
 
-export type RabbitmqForRootParams = RabbitmqConstructorParams & Omit<RabbitmqForFeatureParams, 'name'> & {
+export type RabbitmqForRootParams = RabbitmqConstructorParams & {name?: string;} & Omit<RabbitmqForFeatureParams, 'name'> & {
     isDefault?: boolean;
 };
 
