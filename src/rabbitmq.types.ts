@@ -22,3 +22,7 @@ export type RabbitmqSubscriptionMetadata = Required<RabbitmqSubscribeParams> & {
     instanceToken: string;
     validation: Required<RabbitmqSubscribeParams['validation']>|null;
 }
+
+export type Prettify<T> = {
+    [K in keyof T]: T[K];
+} & {};
