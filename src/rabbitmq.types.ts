@@ -8,7 +8,7 @@ export type RabbitmqForRootParams = RabbitmqConstructorParams & Omit<RabbitmqFor
 };
 
 export type RabbitmqForFeatureParams = {
-    name: string;
+    name?: string;
     exchanges?: RabbitmqExchange[];
     queues?: RabbitmqQueue[];
 }

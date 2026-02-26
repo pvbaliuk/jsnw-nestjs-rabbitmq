@@ -3,6 +3,7 @@ import type {RabbitmqForFeatureParams, RabbitmqForRootParams} from './rabbitmq.t
 import {RabbitmqMetadataStorage} from './rabbitmq-metadata-storage';
 import {RabbitmqCoreModule} from './rabbitmq-core.module';
 import {getInstanceToken, resolveInstanceName} from './rabbitmq.helpers';
+import {RABBITMQ_INSTANCE_DEFAULT_NAME} from './rabbitmq.consts';
 
 @Module({})
 export class RabbitmqModule{
@@ -32,7 +33,7 @@ export class RabbitmqModule{
      * @return {DynamicModule}
      */
     public static forFeature(params: RabbitmqForFeatureParams): DynamicModule{
-        RabbitmqMetadataStorage.addMetadata(getInstanceToken(resolveInstanceName(params.name)), {
+        RabbitmqMetadataStorage.addMetadata(getInstanceToken(params.name ? resolveInstanceName(params.name) : RABBITMQ_INSTANCE_DEFAULT_NAME), {
             exchanges: params.exchanges ?? [],
             queues: params.queues ?? []
         });
