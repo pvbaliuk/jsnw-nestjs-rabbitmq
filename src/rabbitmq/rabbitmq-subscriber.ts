@@ -1,3 +1,4 @@
+import {z, ZodError} from 'zod';
 import {type AsyncMessage, Connection, Consumer, ConsumerStatus} from 'rabbitmq-client';
 import {Logger} from '@nestjs/common';
 import type {RabbitmqSubscribeParams, RabbitmqSubscriberFunction} from './rabbitmq';
@@ -121,6 +122,11 @@ export class RabbitmqSubscriber{
 
             return mapRabbitmqResponseToConsumerStatus(response);
         }catch(e){
+            if(e instanceof ZodError){
+                this.logger.error(`Encountered ZodError:\n${z.prettifyError(e)}`);
+                return ConsumerStatus.DROP;
+            }
+
             this.logger.error(`Error: ${e.constructor.name}(${e.message ?? ''})`);
             return !!this.params.requeue ? ConsumerStatus.REQUEUE : ConsumerStatus.DROP;
         }
