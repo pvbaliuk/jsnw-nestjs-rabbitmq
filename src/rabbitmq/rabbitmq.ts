@@ -17,6 +17,7 @@ export type RabbitmqConstructorParams = ConnectionOptions & {};
 export type RabbitmqResponse = 'ack' | 'drop' | 'requeue';
 
 export type RabbitmqQueueStats = {
+    name: string;
     messages: number;
     consumers: number;
 }
@@ -172,7 +173,11 @@ export class Rabbitmq{
                 passive: true
             });
 
-            return {messages: messageCount, consumers: consumerCount};
+            return {
+                name: typeof queue === 'string' ? queue : queue.name,
+                messages: messageCount,
+                consumers: consumerCount
+            };
         }catch(e){
             return null;
         }
