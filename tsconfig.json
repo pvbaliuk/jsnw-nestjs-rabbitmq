@@ -4,11 +4,10 @@
     "target": "ES2024",
     "moduleResolution": "Node",
     "rootDir": "./src",
-    "outDir": "./dist/lib",
+    "outDir": "./dist",
     "declaration": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "declarationDir": "./dist/types",
     "skipLibCheck": true,
     "esModuleInterop": true
   },
