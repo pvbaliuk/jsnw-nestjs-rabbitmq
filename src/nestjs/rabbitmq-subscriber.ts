@@ -35,11 +35,12 @@ export class RabbitmqSubscriber{
         private readonly params: RabbitmqSubscribeParams<AnyRMQQueue>,
         private readonly subscriber: RabbitmqSubscriberCallback<AnyRMQQueue>
     ) {
+        const queueName = params.queue.exchange.name + '.' + params.queue.name;
         this._isActive = false;
         this.consumer = this.mq.createConsumer({
-            queue: params.queue.name,
+            queue: queueName,
             queueOptions: {
-                queue: params.queue.name,
+                queue: queueName,
                 durable: params.queue.options.durable,
                 autoDelete: params.queue.options.autoDelete,
                 arguments: {

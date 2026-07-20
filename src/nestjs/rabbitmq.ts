@@ -89,16 +89,17 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
      * @return {Promise<void>}
      */
     public async declareQueue(queue: AnyRMQQueue): Promise<void>{
-        return this.deduper.use(`queue:${queue.name}`, async () => {
-            if(this.queues.has(queue.name))
+        const queueName = queue.exchange.name + '.' + queue.name;
+        return this.deduper.use(`queue:${queueName}`, async () => {
+            if(this.queues.has(queueName))
                 return;
 
             await this.declareExchange(queue.exchange)
 
-            this.queues.set(queue.name, queue);
+            this.queues.set(queueName, queue);
             try{
                 await this.mq.queueDeclare({
-                    queue: queue.name,
+                    queue: queueName,
                     durable: queue.options.durable,
                     autoDelete: queue.options.autoDelete,
                     exclusive: queue.options.exclusive
@@ -106,7 +107,7 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
 
                 await this.setupQueueBindings(queue);
             }catch(e){
-                this.queues.delete(queue.name);
+                this.queues.delete(queueName);
                 throw e;
             }
         });
@@ -118,13 +119,14 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
      * @private
      */
     private async setupQueueBindings(queue: AnyRMQQueue): Promise<void>{
-        return this.deduper.use(`queue:${queue.name}:bindings`, async () => {
+        const queueName = queue.exchange.name + '.' + queue.name;
+        return this.deduper.use(`queue:${queueName}:bindings`, async () => {
             const bindings = queue.getAMQPBindings();
             if(bindings.length === 0)
                 return;
 
             await Promise.all(bindings.map(routingKey => this.mq.queueBind({
-                queue: queue.name,
+                queue: queueName,
                 exchange: queue.exchange.name,
                 routingKey: routingKey
             })));
@@ -132,18 +134,19 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
     }
 
     /**
-     * @param {AnyRMQQueue | string} queue
+     * @param {AnyRMQQueue} queue
      * @return {Promise<RabbitmqQueueStats | null>}
      */
-    public async queueStats(queue: AnyRMQQueue|string): Promise<RabbitmqQueueStats|null>{
+    public async queueStats(queue: AnyRMQQueue): Promise<RabbitmqQueueStats|null>{
+        const queueName = queue.exchange.name + '.' + queue.name;
         try{
             const {messageCount, consumerCount} = await this.mq.queueDeclare({
-                queue: typeof queue === 'string' ? queue : queue.name,
+                queue: queueName,
                 passive: true
             });
 
             return {
-                name: typeof queue === 'string' ? queue : queue.name,
+                name: queue.name,
                 messages: messageCount,
                 consumers: consumerCount
             };
@@ -153,12 +156,13 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
     }
 
     /**
-     * @param {string | AnyRMQQueue} queue
+     * @param {AnyRMQQueue} queue
      * @return {Promise<number>}
      */
-    public async purgeQueue(queue: string|AnyRMQQueue): Promise<number>{
+    public async purgeQueue(queue: AnyRMQQueue): Promise<number>{
+        const queueName = queue.exchange.name + '.' + queue.name;
         const {messageCount} = await this.mq.queuePurge({
-            queue: typeof queue === 'string' ? queue : queue.name
+            queue: queueName
         });
 
         return messageCount;
