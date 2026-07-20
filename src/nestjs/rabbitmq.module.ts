@@ -25,7 +25,7 @@ export class RabbitmqModule{
      * @return {DynamicModule}
      */
     public static forFeature(items?: {exchanges?: AnyRMQExchange[]; queues?: AnyRMQQueue[];}): DynamicModule{
-        if(!items){
+        if(items){
             if('exchanges' in items && Array.isArray(items.exchanges) && items.exchanges.length > 0)
                 RabbitmqStorage.addExchanges(items.exchanges);
 
