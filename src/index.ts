@@ -1,6 +1,12 @@
-export * from './rabbitmq';
-export {RabbitmqModule} from './rabbitmq.module';
-export type {RabbitmqOptions} from './rabbitmq.types';
-export {RabbitmqSubscribe} from './rabbitmq.decorators';
+export {
+    createExchange, RMQExchange, RMQQueue,
+    type RMQMessageContract, type RMQExchangeContract, type RMQExchangeOptions, type RMQExchangeType,
+    type RMQQueueOptions, type RMQMessageParams,
+    type AnyRMQExchange, type AnyRMQQueue
+} from './dsl';
 
-export {type AsyncMessage} from 'rabbitmq-client';
+export {
+    RabbitmqModule, Rabbitmq, RabbitmqSubscriber,
+    type RabbitmqOptions, type RabbitmqForFeatureOptions, type RabbitmqPublishParams, type RabbitmqSubscribeParams,
+    type RabbitmqSubscriberResult, type RabbitmqSubscriberCallback, type RabbitmqQueueStats
+} from './nestjs';

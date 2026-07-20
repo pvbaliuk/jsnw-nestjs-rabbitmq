@@ -1,6 +1,6 @@
 {
   "name": "@jsnw/nestjs-rabbitmq",
-  "version": "2.0.5",
+  "version": "3.0.0",
   "description": "NestJS module for RabbitMQ integration",
   "exports": {
     "require": {
@@ -49,6 +49,7 @@
   "devDependencies": {
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
+    "@types/node": "catalog:",
     "jest": "catalog:",
     "ts-jest": "catalog:",
     "tsdown": "catalog:",

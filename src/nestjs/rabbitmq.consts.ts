@@ -1,0 +1,1 @@
+export const RABBITMQ_OPTIONS_TOKEN = Symbol('RABBITMQ_OPTIONS');
