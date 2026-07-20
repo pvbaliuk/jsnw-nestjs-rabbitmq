@@ -106,7 +106,7 @@ export const createExchange = <
 export type RMQQueueOptions = {
     durable: boolean;
     autoDelete: boolean;
-    exclusive: boolean;
+    exclusive?: boolean;
     xMessageTtlMs?: number;
 }
 
