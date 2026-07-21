@@ -49,6 +49,7 @@
   "devDependencies": {
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
+    "@types/jest": "catalog:",
     "@types/node": "catalog:",
     "jest": "catalog:",
     "ts-jest": "catalog:",

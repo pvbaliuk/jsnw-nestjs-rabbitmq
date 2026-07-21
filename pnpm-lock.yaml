@@ -12,6 +12,9 @@ catalogs:
     '@nestjs/core':
       specifier: ^11.1.28
       version: 11.1.28
+    '@types/jest':
+      specifier: ^30.0.0
+      version: 30.0.0
     '@types/node':
       specifier: ^24.13.3
       version: 24.13.3
@@ -51,6 +54,9 @@ importers:
       '@nestjs/core':
         specifier: 'catalog:'
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@types/jest':
+        specifier: 'catalog:'
+        version: 30.0.0
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3
@@ -557,6 +563,9 @@ packages:
 
   '@types/istanbul-reports@3.0.4':
     resolution: {integrity: sha512-pk2B1NWalF9toCRu6gjBzR69syFjP4Od8WRAX+0mmf9lAjCRicLOWc+ZrxZHx/0XRjotgkF9t6iaMJ+aXcOdZQ==}
+
+  '@types/jest@30.0.0':
+    resolution: {integrity: sha512-XTYugzhuwqWjws0CVz8QpM36+T+Dz5mTEBKhNs/esGLnCIlGdRy+Dq78NRjd7ls7r8BC8ZRMOrKlkO1hU0JOwA==}
 
   '@types/node@24.13.3':
     resolution: {integrity: sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q==}
@@ -2468,6 +2477,11 @@ snapshots:
   '@types/istanbul-reports@3.0.4':
     dependencies:
       '@types/istanbul-lib-report': 3.0.3
+
+  '@types/jest@30.0.0':
+    dependencies:
+      expect: 30.4.1
+      pretty-format: 30.4.1
 
   '@types/node@24.13.3':
     dependencies:
