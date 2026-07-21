@@ -292,7 +292,7 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
             */
             // contentType: options.type === 'json' ? 'application/json' : undefined,
             expiration: options?.ttlMs !== undefined ? options.ttlMs.toString() : undefined
-        }, msg.payload ? JSON.stringify(payload) : payload);
+        }, payload);
     }
 
     /**
