@@ -212,13 +212,13 @@ export class RMQQueue<
 
     /**
      * @template {string} TSubname
-     * @param {TSubname} name
+     * @param {TSubname} subname
      * @param {RMQBindingParams<TExchange, this>} bindingParams
      * @return {RMQQueue<TExchange, _TName, TBindings>}
      */
-    public withBindingParams<TSubname extends string>(name: TSubname, bindingParams: RMQBindingParams<TExchange, this>): RMQQueue<TExchange, TSubname, TBindings>{
-        return new RMQQueue<TExchange, TSubname, TBindings>(
-            name,
+    public withBindingParams<TSubname extends string>(subname: TSubname, bindingParams: RMQBindingParams<TExchange, this>): RMQQueue<TExchange, `${TName}.${TSubname}`, TBindings>{
+        return new RMQQueue<TExchange, `${TName}.${TSubname}`, TBindings>(
+            (this.name + '.' + subname) as `${TName}.${TSubname}`,
             this.exchange,
             this.bindings,
             {...this.options},
