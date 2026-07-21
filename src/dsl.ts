@@ -14,8 +14,6 @@ type ExtractParams<S extends string> = S extends `${infer Segment}.${infer Rest}
 export type RMQMessageContract<T extends string> = {
     routingKey: T;
     payload?: z.ZodSchema;
-    durable?: boolean;
-    ttlMs?: number;
 }
 
 export type RMQMessagePayload<T extends RMQMessageContract<any>> = Without<{
@@ -23,9 +21,11 @@ export type RMQMessagePayload<T extends RMQMessageContract<any>> = Without<{
     data: T['payload'] extends z.ZodSchema ? z.output<T['payload']> : never;
 }, never>;
 
+export type RMQMessageRoutingParams<T extends RMQMessageContract<any>> = ExtractParams<T['routingKey']>;
+
 export type RMQMessageParams<T extends RMQMessageContract<any>> = Without<{
     payload: T['payload'] extends z.ZodSchema ? z.input<T['payload']> : never;
-    params: keyof ExtractParams<T['routingKey']> extends never ? never : ExtractParams<T['routingKey']>;
+    params: keyof RMQMessageRoutingParams<T> extends never ? never : RMQMessageRoutingParams<T>;
 }, never>;
 
 //endregion
@@ -114,6 +114,22 @@ export type RMQQueuePayloads<T extends RMQQueue<RMQExchange<any, any>, any, any>
     [K in T['bindings'][number]]: RMQMessagePayload<T['exchange']['messages'][K]>;
 }[T['bindings'][number]]>;
 
+export type RMQBindingParams<
+    TExchange extends RMQExchange<any, Record<string, RMQMessageContract<any>>>,
+    TQueue extends RMQQueue<TExchange, any, (keyof TExchange['messages'])[]>
+> = Prettify<Without<{
+    [K in TQueue['bindings'][number]]?: keyof RMQMessageRoutingParams<TExchange['messages'][K]> extends never
+        ? never
+        : Array<Partial<RMQMessageRoutingParams<TExchange['messages'][K]>>>;
+}, never>>;
+
+export type AnyRMQBindingParams = Record<string, Array<any>>;
+
+/**
+ * @template {RMQExchange<any, any>} TExchange
+ * @template {string} TName
+ * @template {(keyof TExchange['messages'])[]} TBindings
+ */
 export class RMQQueue<
     TExchange extends RMQExchange<any, any>,
     TName extends string,
@@ -123,17 +139,69 @@ export class RMQQueue<
     public readonly name: TName;
     public readonly exchange: TExchange;
     public readonly bindings: TBindings;
+    public readonly bindingParams: AnyRMQBindingParams;
     public readonly options: RMQQueueOptions;
+
+    private resolvedNameCached: string;
+    private resolvedRoutingKeysCached: string[] = [];
+
+    public get displayName(): TName{
+        return this.name;
+    }
+
+    /**
+     * @return {string}
+     */
+    public get resolvedName(): string{
+        if(this.resolvedNameCached !== undefined)
+            return this.resolvedNameCached;
+
+        this.resolvedNameCached = this.exchange.name + '.' + this.name;
+        return this.resolvedNameCached;
+    }
+
+    /**
+     * @return {string[]}
+     */
+    public get resolvedRoutingKeys(): string[]{
+        if(this.resolvedRoutingKeysCached.length > 0)
+            return this.resolvedRoutingKeysCached;
+
+        const out: string[] = [];
+        for(const mKey of this.bindings){
+            const contract: RMQMessageContract<any> = this.exchange.messages[mKey];
+            const bParams = this.bindingParams[mKey as string] || undefined;
+
+            if(!bParams || bParams.length === 0){
+                out.push(contract.routingKey.replaceAll(/\{[A-Za-z\d_\-]+\}/iug, '*'));
+            }else{
+                for(const param of bParams){
+                    let rk: string = contract.routingKey;
+                    for(const [k, v] of Object.entries(param)){
+                        rk = rk.replaceAll(`{${k}}`, v.toString());
+                    }
+
+                    rk = rk.replaceAll(/\{[A-Za-z\d_\-]+\}/iug, '*');
+                    out.push(rk);
+                }
+            }
+        }
+
+        this.resolvedRoutingKeysCached = out;
+        return out;
+    }
 
     public constructor(
         name: TName,
         exchange: TExchange,
         bindings: TBindings,
-        options?: Partial<RMQQueueOptions>
+        options?: Partial<RMQQueueOptions>,
+        bindingParams?: AnyRMQBindingParams
     ) {
         this.name = name;
         this.exchange = exchange;
         this.bindings = bindings;
+        this.bindingParams = bindingParams ?? {};
         this.options = Object.freeze({
             durable: !!options?.durable,
             autoDelete: !!options?.autoDelete,
@@ -143,13 +211,19 @@ export class RMQQueue<
     }
 
     /**
-     * @return {string[]}
+     * @template {string} TSubname
+     * @param {TSubname} name
+     * @param {RMQBindingParams<TExchange, this>} bindingParams
+     * @return {RMQQueue<TExchange, _TName, TBindings>}
      */
-    public getAMQPBindings(): string[]{
-        return this.bindings.map((key: string) => {
-            return (this.exchange.messages[key]['routingKey'] as string)
-                .replaceAll(/\{[A-Za-z0-9_\-]+\}/iug, '*');
-        }).filter(Boolean);
+    public withBindingParams<TSubname extends string>(name: TSubname, bindingParams: RMQBindingParams<TExchange, this>): RMQQueue<TExchange, TSubname, TBindings>{
+        return new RMQQueue<TExchange, TSubname, TBindings>(
+            name,
+            this.exchange,
+            this.bindings,
+            {...this.options},
+            bindingParams
+        );
     }
 
 }

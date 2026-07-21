@@ -3,10 +3,11 @@ import {
     type AnyRMQExchange,
     type AnyRMQQueue,
     RMQExchange,
-    RMQMessageContract, RMQMessageParams,
+    RMQMessageContract, RMQMessageParams, RMQMessageRoutingParams,
     RMQQueue,
     RMQQueuePayloads
 } from '../dsl';
+import {Without} from '../shared';
 
 export type RabbitmqForFeatureOptions = {
     exchanges?: AnyRMQExchange[];
@@ -21,7 +22,7 @@ export type RabbitmqQueueStats = {
     consumers: number;
 }
 
-export type RabbitmqSubscribeParams<TQueue extends RMQQueue<RMQExchange<any, any>, any, any>> = {
+export type RabbitmqSubscribeParams<TQueue extends RMQQueue<RMQExchange<any, Record<string, RMQMessageContract<any>>>, any, any>> = {
     queue: TQueue;
     id?: string;
     requeue?: boolean;
@@ -46,6 +47,11 @@ export type RabbitmqSubscribeParams<TQueue extends RMQQueue<RMQExchange<any, any
      * no-ack option is set.
      * */
     prefetchCount?: number;
+    params?: Without<{
+        [K in TQueue['bindings'][number]]: keyof RMQMessageRoutingParams<TQueue['exchange']['messages'][K]> extends never
+            ? never
+            : { [K1 in keyof RMQMessageRoutingParams<TQueue['exchange']['messages'][K]>]: Array<RMQMessageRoutingParams<TQueue['exchange']['messages'][K]>>; }
+    }, never>;
 }
 
 export type RabbitmqSubscriberResult = 'ack' | 'drop' | 'requeue';
@@ -58,3 +64,8 @@ export type RabbitmqPublishParams<
     TExchange extends RMQExchange<any, Record<string, RMQMessageContract<any>>>,
     TKey extends keyof TExchange['messages']
 > = RMQMessageParams<TExchange['messages'][TKey]>;
+
+export type RabbitmqPublishOptions = {
+    durable?: boolean;
+    ttlMs?: number;
+};

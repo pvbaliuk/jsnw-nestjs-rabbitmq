@@ -3,7 +3,8 @@ export {
     type RMQMessageContract, type RMQExchangeContract, type RMQExchangeOptions, type RMQExchangeType,
     type RMQQueueOptions, type RMQMessageParams,
     type AnyRMQExchange, type AnyRMQQueue,
-    type RMQMessagePayload, type RMQQueuePayloads
+    type RMQMessagePayload, type RMQQueuePayloads,
+    type AnyRMQBindingParams, type RMQBindingParams, type RMQMessageRoutingParams
 } from './dsl';
 
 export {

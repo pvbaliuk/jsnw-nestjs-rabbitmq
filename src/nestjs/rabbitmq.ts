@@ -5,12 +5,13 @@ import {createInFlightDeduper} from '../shared';
 import {type AnyRMQExchange, type AnyRMQQueue, type RMQMessageContract, RMQExchange} from '../dsl';
 import {RABBITMQ_OPTIONS_TOKEN} from './rabbitmq.consts';
 import type {
-    RabbitmqOptions, RabbitmqPublishParams,
+    RabbitmqOptions, RabbitmqPublishOptions, RabbitmqPublishParams,
     RabbitmqQueueStats,
     RabbitmqSubscribeParams, RabbitmqSubscriberCallback
 } from './rabbitmq.types';
 import {RabbitmqSubscriber} from './rabbitmq-subscriber';
 import {RabbitmqStorage} from './rabbitmq-storage';
+import {chunk} from '../shared/utils';
 
 @Injectable()
 export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
@@ -89,17 +90,16 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
      * @return {Promise<void>}
      */
     public async declareQueue(queue: AnyRMQQueue): Promise<void>{
-        const queueName = queue.exchange.name + '.' + queue.name;
-        return this.deduper.use(`queue:${queueName}`, async () => {
-            if(this.queues.has(queueName))
+        return this.deduper.use(`queue:${queue.resolvedName}`, async () => {
+            if(this.queues.has(queue.resolvedName))
                 return;
 
             await this.declareExchange(queue.exchange)
 
-            this.queues.set(queueName, queue);
+            this.queues.set(queue.resolvedName, queue);
             try{
                 await this.mq.queueDeclare({
-                    queue: queueName,
+                    queue: queue.resolvedName,
                     durable: queue.options.durable,
                     autoDelete: queue.options.autoDelete,
                     exclusive: queue.options.exclusive
@@ -107,7 +107,7 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
 
                 await this.setupQueueBindings(queue);
             }catch(e){
-                this.queues.delete(queueName);
+                this.queues.delete(queue.resolvedName);
                 throw e;
             }
         });
@@ -119,17 +119,19 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
      * @private
      */
     private async setupQueueBindings(queue: AnyRMQQueue): Promise<void>{
-        const queueName = queue.exchange.name + '.' + queue.name;
-        return this.deduper.use(`queue:${queueName}:bindings`, async () => {
-            const bindings = queue.getAMQPBindings();
-            if(bindings.length === 0)
+        return this.deduper.use(`queue:${queue.resolvedName}:bindings`, async () => {
+            const routingKeys = queue.resolvedRoutingKeys;
+            if(routingKeys.length === 0)
                 return;
 
-            await Promise.all(bindings.map(routingKey => this.mq.queueBind({
-                queue: queueName,
-                exchange: queue.exchange.name,
-                routingKey: routingKey
-            })));
+            const chunks = chunk(routingKeys, 20);
+            for(const chunk of chunks){
+                await Promise.all(chunk.map(k => this.mq.queueBind({
+                    queue: queue.resolvedName,
+                    exchange: queue.exchange.name,
+                    routingKey: k
+                })));
+            }
         });
     }
 
@@ -138,10 +140,9 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
      * @return {Promise<RabbitmqQueueStats | null>}
      */
     public async queueStats(queue: AnyRMQQueue): Promise<RabbitmqQueueStats|null>{
-        const queueName = queue.exchange.name + '.' + queue.name;
         try{
             const {messageCount, consumerCount} = await this.mq.queueDeclare({
-                queue: queueName,
+                queue: queue.resolvedName,
                 passive: true
             });
 
@@ -160,9 +161,8 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
      * @return {Promise<number>}
      */
     public async purgeQueue(queue: AnyRMQQueue): Promise<number>{
-        const queueName = queue.exchange.name + '.' + queue.name;
         const {messageCount} = await this.mq.queuePurge({
-            queue: queueName
+            queue: queue.resolvedName
         });
 
         return messageCount;
@@ -237,12 +237,13 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
      * @param {TExchange} exchange
      * @param {TKey} key
      * @param {RabbitmqPublishParams<TExchange, TKey>} params
+     * @param {RabbitmqPublishOptions} [options]
      * @return {Promise<void>}
      */
     public async publish<
         TExchange extends RMQExchange<any, any>,
         TKey extends keyof TExchange['messages']
-    >(exchange: TExchange, key: TKey, params: RabbitmqPublishParams<TExchange, TKey>): Promise<void>{
+    >(exchange: TExchange, key: TKey, params: RabbitmqPublishParams<TExchange, TKey>, options?: RabbitmqPublishOptions): Promise<void>{
         if(!this.publisher)
             this.publisher = this.mq.createPublisher();
 
@@ -258,7 +259,7 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
         return this.publisher.send({
             exchange: exchange.name,
             routingKey: routingKey,
-            durable: msg?.durable !== undefined ? msg.durable : exchange.options.durable,
+            durable: options?.durable ?? exchange.options.durable,
             /*
             As it turned out, rabbitmq-client's Envelope['contentType'] is not used anywhere,
             the library sets contentType property based on the type of message body and completely
@@ -267,7 +268,7 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
             https://github.com/cody-greene/node-rabbitmq-client/blob/af2317717e2ef169717f2371ddf2c8bf2843ed37/src/Channel.ts#L501
             */
             // contentType: options.type === 'json' ? 'application/json' : undefined,
-            expiration: msg?.ttlMs?.toString() ?? undefined
+            expiration: options?.ttlMs !== undefined ? options.ttlMs.toString() : undefined
         }, msg.payload ? JSON.stringify(payload) : payload);
     }
 
