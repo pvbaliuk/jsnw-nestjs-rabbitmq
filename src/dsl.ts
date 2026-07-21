@@ -234,7 +234,7 @@ export class RMQQueue<
      * @param {RMQBindingParams<TExchange, this>} bindingParams
      * @return {RMQQueue<TExchange, _TName, TBindings>}
      */
-    public withBindingParams<TSubname extends string>(subname: TSubname, bindingParams: RMQBindingParams<TExchange, this>): RMQQueue<TExchange, `${TName}.${TSubname}`, TBindings>{
+    public childQueue<TSubname extends string>(subname: TSubname, bindingParams: RMQBindingParams<TExchange, this>): RMQQueue<TExchange, `${TName}.${TSubname}`, TBindings>{
         return new RMQQueue<TExchange, `${TName}.${TSubname}`, TBindings>(
             (this.name + '.' + subname) as `${TName}.${TSubname}`,
             this.exchange,

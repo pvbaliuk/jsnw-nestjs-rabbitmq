@@ -40,7 +40,7 @@ describe('dsl', () => {
         });
 
         it('correctly resolves queue name for child queue', () => {
-            expect(queue.withBindingParams('sub', {}).resolvedName).toBe('events.events-queue.sub');
+            expect(queue.childQueue('sub', {}).resolvedName).toBe('events.events-queue.sub');
         });
 
         it('correctly resolves single routing key', () => {
@@ -54,7 +54,7 @@ describe('dsl', () => {
         });
 
         it('correctly resolves routing keys for queue with binding params specified', () => {
-            expect(queue.withBindingParams('events-queue-1', {
+            expect(queue.childQueue('events-queue-1', {
                 testEvent: [{id: '1'}, {id: '2'}, {id: '3'}],
                 userEvent: [{id: '1'}, {id: '2', action: 'update'}]
             }).resolvedRoutingKeys.sort()).toEqual([
