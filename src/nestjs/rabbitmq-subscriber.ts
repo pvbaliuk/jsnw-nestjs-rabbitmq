@@ -149,22 +149,17 @@ export class RabbitmqSubscriber{
         if(!this.isValidMessageBody(message))
             return null;
 
-        if(message.contentType === 'application/json'){
-            if(Buffer.isBuffer(message.body) || typeof message.body === 'string'){
-                const jsonString = Buffer.isBuffer(message.body)
-                    ? message.body.toString('utf-8')
-                    : message.body;
+        // rabbitmq-client doesn't correctly set content-type of a message, so we assume that any message has an application/json type
+        // https://github.com/cody-greene/node-rabbitmq-client/blob/2729343807acedde3ac0b80adc2fc5c5b5d3f2a0/src/Channel.ts#L501
+        if(Buffer.isBuffer(message.body) || typeof message.body === 'string'){
+            const jsonString = Buffer.isBuffer(message.body)
+                ? message.body.toString('utf-8')
+                : message.body;
 
-                return JSON.parse(jsonString);
-            }
-
-            return message.body;
-        }else{
-            if(Buffer.isBuffer(message.body))
-                return message.body.toString('utf-8');
-
-            return message.body;
+            return JSON.parse(jsonString);
         }
+
+        return message.body;
     }
 
     /**
