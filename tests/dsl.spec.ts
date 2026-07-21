@@ -43,6 +43,11 @@ describe('dsl', () => {
             expect(queue.withBindingParams('sub', {}).resolvedName).toBe('events.events-queue.sub');
         });
 
+        it('correctly resolves single routing key', () => {
+            expect(queue.resolveBindingKey('testEvent', {id: '1'})).toBe('event.1');
+            expect(queue.resolveBindingKey('testEvent')).toBe('event.*');
+        });
+
         it('correctly resolves routing keys', () => {
             expect(queue.resolvedRoutingKeys.sort())
                 .toEqual(['event', 'event.*', 'users.*.*'].sort());

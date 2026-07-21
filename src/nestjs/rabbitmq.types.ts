@@ -47,6 +47,10 @@ export type RabbitmqSubscribeParams<TQueue extends RMQQueue<RMQExchange<any, Rec
      * no-ack option is set.
      * */
     prefetchCount?: number;
+    /**
+     * If true, rabbitmq won't set up queue bindings automatically
+     */
+    noAutoBinding?: boolean;
     params?: Without<{
         [K in TQueue['bindings'][number]]: keyof RMQMessageRoutingParams<TQueue['exchange']['messages'][K]> extends never
             ? never

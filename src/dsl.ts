@@ -211,6 +211,24 @@ export class RMQQueue<
     }
 
     /**
+     * @template {string} K
+     * @param {K} routingKey
+     * @param {Partial<RMQMessageRoutingParams<TExchange["messages"][K]>>} param
+     * @return {string}
+     */
+    public resolveBindingKey<K extends keyof TExchange['messages']>(routingKey: K, param?: Partial<RMQMessageRoutingParams<TExchange['messages'][K]>>){
+        const message: RMQMessageContract<any> = this.exchange.messages[routingKey];
+        let outKey: string = message.routingKey;
+
+        if(param){
+            for(const [k, v] of Object.entries(param))
+                outKey = outKey.replaceAll(`{${k}}`, v.toString());
+        }
+
+        return outKey.replaceAll(/\{[A-Za-z\d_\-]+\}/iug, '*');
+    }
+
+    /**
      * @template {string} TSubname
      * @param {TSubname} subname
      * @param {RMQBindingParams<TExchange, this>} bindingParams

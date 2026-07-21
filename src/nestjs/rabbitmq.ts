@@ -87,9 +87,10 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
 
     /**
      * @param {AnyRMQQueue} queue
+     * @param {boolean} [noAutoBinding=false]
      * @return {Promise<void>}
      */
-    public async declareQueue(queue: AnyRMQQueue): Promise<void>{
+    public async declareQueue(queue: AnyRMQQueue, noAutoBinding: boolean = false): Promise<void>{
         return this.deduper.use(`queue:${queue.resolvedName}`, async () => {
             if(this.queues.has(queue.resolvedName))
                 return;
@@ -105,11 +106,25 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
                     exclusive: queue.options.exclusive
                 });
 
-                await this.setupQueueBindings(queue);
+                if(!noAutoBinding)
+                    await this.setupQueueBindings(queue);
             }catch(e){
                 this.queues.delete(queue.resolvedName);
                 throw e;
             }
+        });
+    }
+
+    /**
+     * @param {AnyRMQQueue} queue
+     * @param {string} routingKey
+     * @return {Promise<void>}
+     */
+    public bindQueue(queue: AnyRMQQueue, routingKey: string): Promise<void>{
+        return this.mq.queueBind({
+            queue: queue.resolvedName,
+            exchange: queue.exchange.name,
+            routingKey: routingKey
         });
     }
 
@@ -125,13 +140,8 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
                 return;
 
             const chunks = chunk(routingKeys, 20);
-            for(const chunk of chunks){
-                await Promise.all(chunk.map(k => this.mq.queueBind({
-                    queue: queue.resolvedName,
-                    exchange: queue.exchange.name,
-                    routingKey: k
-                })));
-            }
+            for(const chunk of chunks)
+                await Promise.all(chunk.map(k => this.bindQueue(queue, k)));
         });
     }
 
@@ -181,7 +191,7 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
                 : subscriber.instance.constructor.name + '.' + subscriber.methodName
         );
 
-        await this.declareQueue(params.queue);
+        await this.declareQueue(params.queue, !!params.noAutoBinding);
         if(this.subscribers.has(id))
             throw new Error(`Seems like a subscriber (id: ${id}) is already registered`);
 
