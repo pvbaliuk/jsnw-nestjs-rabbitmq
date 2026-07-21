@@ -40,7 +40,7 @@ describe('dsl', () => {
         });
 
         it('correctly resolves queue name for child queue', () => {
-            expect(queue.withBindingParams('events-queue-1', {}).resolvedName).toBe('events.events-queue-1');
+            expect(queue.withBindingParams('sub', {}).resolvedName).toBe('events.events-queue.sub');
         });
 
         it('correctly resolves routing keys', () => {
