@@ -134,10 +134,10 @@ export class RabbitmqSubscriber{
      * @protected
      */
     protected isValidMessageBody(message: AsyncMessage): boolean{
-        return (!message.body || (
-            typeof message.body !== 'string'
-            && typeof message.body !== 'object'
-            && !Buffer.isBuffer(message.body)));
+        return (message.body && (
+            typeof message.body === 'string'
+            || (typeof message.body === 'object'
+            && !Buffer.isBuffer(message.body))));
     }
 
     /**
