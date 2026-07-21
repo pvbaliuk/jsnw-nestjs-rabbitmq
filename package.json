@@ -1,6 +1,6 @@
 {
   "name": "@jsnw/nestjs-rabbitmq",
-  "version": "3.0.0-rc.10",
+  "version": "3.0.0-rc.11",
   "description": "NestJS module for RabbitMQ integration",
   "exports": {
     "require": {
