@@ -130,6 +130,19 @@ export class Rabbitmq implements OnModuleInit, OnModuleDestroy{
 
     /**
      * @param {AnyRMQQueue} queue
+     * @param {string} routingKey
+     * @return {Promise<void>}
+     */
+    public unbindQueue(queue: AnyRMQQueue, routingKey: string): Promise<void>{
+        return this.mq.queueUnbind({
+            queue: queue.resolvedName,
+            exchange: queue.exchange.name,
+            routingKey: routingKey
+        });
+    }
+
+    /**
+     * @param {AnyRMQQueue} queue
      * @return {Promise<void>}
      * @private
      */
